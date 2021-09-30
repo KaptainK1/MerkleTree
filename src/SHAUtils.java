@@ -41,6 +41,8 @@ public class SHAUtils {
         BigInteger leftHashInt = new BigInteger(leftHash);
         BigInteger rightHashInt = new BigInteger(rightHash);
 
+//        System.out.println("result: " + leftHashInt+rightHashInt);
+
         BigInteger finalHashInt = leftHashInt.add(rightHashInt);
 
         return SHAUtils.digest(finalHashInt.toByteArray(), algorithm);

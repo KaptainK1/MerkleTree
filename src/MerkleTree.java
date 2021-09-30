@@ -1,5 +1,6 @@
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -10,18 +11,22 @@ public class MerkleTree {
     private int levels;
     public String hashingAlgorithm = "SHA-256";
     private List<MerkleNode> leafs = new ArrayList<>();
+    private ArrayList<MerkleNode> parents = new ArrayList<>();
 
-    public MerkleTree(ArrayList<Integer> unspentTransactions){
+    public MerkleTree(ArrayList<String> unspentTransactions){
 
-        if (unspentTransactions.size() % 2 == 0){
-            this.size = unspentTransactions.size();
-        } else {
-            //we have an uneven tree, need to add 1 dummy node
-            this.size = unspentTransactions.size() +1;
-        }
+//        if (unspentTransactions.size() % 2 == 0){
+//            this.size = unspentTransactions.size();
+//        } else {
+//            //we have an uneven tree, need to add 1 dummy node
+//            this.size = unspentTransactions.size() +1;
+//        }
+
+        this.size = unspentTransactions.size();
 
         //calculate the number of levels needed for our tree
         this.levels = (int) Math.ceil((Math.log10(size) / Math.log10(2)));
+        System.out.println("Levels: " + this.levels);
 
         //create all the leaf nodes
         for (int i = 0; i < unspentTransactions.size(); i++) {
@@ -29,78 +34,125 @@ public class MerkleTree {
             ByteBuffer b = ByteBuffer.allocate(32);
 
             //we need to covert the data into a byte array by using the byte buffer
-            b.putInt(unspentTransactions.get(i));
+            //b.put(unspentTransactions.get(i));
+            b.put(unspentTransactions.get(i).getBytes());
             byte[] data = b.array();
 
             //add the leaf node
-            leafs.add(new MerkleNode(SHAUtils.digest(data,hashingAlgorithm),null, null));
+            leafs.add(new MerkleNode(SHAUtils.digest(data,hashingAlgorithm), unspentTransactions.get(i) ,null, null));
 
         }
 
         int numberOfDuplicateNodes = (int)(Math.pow(2,this.levels) - size);
+        System.out.println("Number of duplicates: " + numberOfDuplicateNodes);
 
+        //create some dummy nodes in order to create a full tree. we cant have a tree that does not equal
+        //a power of two.
         for (int i = 0; i < numberOfDuplicateNodes; i++) {
-            leafs.add(new MerkleNode(leafs.get(i+size).getData(),null,null));
+            leafs.add(new MerkleNode(leafs.get(i+size -1).getData(), leafs.get(i+size -1).getUnHashedData() ,null,null));
         }
 
-        //int numberOfNodesNeeded = (int) (Math.pow(2,unspentTransations.size()));
-
+        buildMerkleTree(unspentTransactions);
 
     }
 
-    public void buildMerkleTree(ArrayList<Integer> unspentTransactions){
+    //function to build the Merkle Tree from the bottom up
+    public void buildMerkleTree(ArrayList<String> unspentTransactions){
 
-        ArrayList<MerkleNode> parents = new ArrayList<>();
-        parents = createDirectParents(parents);
+        createDirectParents();
 
+        System.out.println("Levels: " + this.levels);
+        System.out.println("Size: " + this.size);
 
-        for (int i = 3; i < this.levels +1; i++) {
+        //Since we build our direct parent nodes in another function,
+        //our first two bottom levels are built, so we can start at the third level
+        for (int i = this.levels - 2; i > this.levels; i--) {
 
+            //Here we want to loop as many times as there are nodes at the ith level
+            // which we can calculate with Math.pow(2,i-1)
+            for (int j = 0; j <= (int) Math.pow(2,i); j+=2) {
 
-            for (int j = 0; j < (leafs.size() / i); j+=2) {
+                System.out.println(Math.pow(2,i-1));
+                System.out.println("i is" + i);
+                System.out.println("j is" + j);
+                byte[] combinedHash = SHAUtils.concatenateHash(parents.get(j+i -1).getData(),
+                                                                parents.get(j+i).getData(),
+                                                                hashingAlgorithm);
 
-                byte[] combinedHash = SHAUtils.concatenateHash(parents.get(j+i).getData(), parents.get(j+i+1).getData(), hashingAlgorithm);
-                MerkleNode node = new MerkleNode(combinedHash,parents.get(j+i), parents.get(j+i+1));
+                MerkleNode node = new MerkleNode(combinedHash,parents.get(j+i -1).getUnHashedData() + parents.get(j+i).getUnHashedData(),
+                                                    parents.get(j+i -1),
+                                                    parents.get(j+i ));
+
                 parents.add(node);
+                System.out.println(node);
 
             }
 
         }
 
+        //set the merkle root to the last element in the parents array list
+        byte[] combinedHash = SHAUtils.concatenateHash(parents.get(parents.size() -2).getData(),
+                parents.get(parents.size() -1).getData(),
+                hashingAlgorithm);
+
+        this.merkleRoot = new MerkleNode(combinedHash, parents.get(parents.size() -2).getUnHashedData() + parents.get(parents.size() -1).getUnHashedData(), parents.get(parents.size() -2), parents.get(parents.size() -1));
+
     }
 
-    private ArrayList<MerkleNode> createDirectParents(ArrayList<MerkleNode> parents){
+    public void printMerkleTree(){
 
-        for (int i = 0; i < leafs.size() / 2; i+=2) {
+        //loop through each of the leaf nodes to print them out
+        //this is our data nodes, in the future these will be our
+        //transactions. For now they are just integers
 
-            byte[] combinedHash = SHAUtils.concatenateHash(leafs.get(i).getData(), leafs.get(i+1).getData(), hashingAlgorithm);
-            MerkleNode directParent = new MerkleNode(combinedHash, leafs.get(i), leafs.get(i+1));
+        printInOrder(this.merkleRoot);
+
+    }
+
+    public void printInOrder(MerkleNode node){
+        if (node == null)
+            return;
+
+        printInOrder(node.getLeft());
+
+        System.out.println(node.getUnHashedData());
+
+        printInOrder(node.getRight());
+    }
+
+    private void createDirectParents(){
+
+        for (int i = 0; i < leafs.size() ; i+=2) {
+
+            byte[] combinedHash = SHAUtils.concatenateHash(leafs.get(i).getData(),
+                                                            leafs.get(i+1).getData(),
+                                                            hashingAlgorithm);
+            MerkleNode directParent = new MerkleNode(combinedHash,
+                                                        leafs.get(i).getUnHashedData() + leafs.get(i+1).getUnHashedData(),
+                                                        leafs.get(i),
+                                                        leafs.get(i+1));
             parents.add(directParent);
+            System.out.println(directParent.getUnHashedData());
         }
 
-        return parents;
-
     }
 
-
-//    private void insertMerkleNode(byte data[], MerkleNode left, MerkleNode right){
-//        MerkleNode node = new MerkleNode();
-//
-//        if (left == null && right == null){
-//            node.setData(SHAUtils.digest(data, hashingAlgorithm));
-//        } else if(left == null){
-//            byte prevHashes[] = new byte[left.getData().length + right.getData().length];
-//            System.arraycopy(left.getData(), 0, prevHashes,0, left.getData().length);
-//            System.arraycopy(right.getData(),0,prevHashes, left.getData().length +1,right.getData().length);
-//
-//            node.setData(SHAUtils.digest(prevHashes, hashingAlgorithm));
-//        }
-//
-//        node.setLeft(left);
-//        node.setRight(right);
-//
-//    }
+    public static void main(String[] args){
+        String[] strings = new String[]{"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"};
+        ArrayList<String> test = new ArrayList<String>(
+                Arrays.asList(strings)
+                );
 
 
+        System.out.println(test);
+
+        MerkleTree tree = new MerkleTree(test);
+
+        tree.printMerkleTree();
+
+        System.out.println(tree.merkleRoot.getUnHashedData());
+        System.out.println(tree.merkleRoot);
+
+    }
 
 }
