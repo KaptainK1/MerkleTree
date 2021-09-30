@@ -3,7 +3,7 @@ import java.util.Arrays;
 
 public class MerkleNode {
 
-    private byte data[];
+    private byte[] data;
 
 
 
@@ -11,7 +11,7 @@ public class MerkleNode {
     private MerkleNode left;
     private MerkleNode right;
 
-    public MerkleNode(byte data[], String unHashedData, MerkleNode left, MerkleNode right){
+    public MerkleNode(byte[] data, String unHashedData, MerkleNode left, MerkleNode right){
         //clone the data (ie data to be hashed)
         this.data = data.clone();
         this.unHashedData = unHashedData;
@@ -64,6 +64,8 @@ public class MerkleNode {
         StringBuilder builder = new StringBuilder();
         builder.append("-Data---");
         builder.append(this.getUnHashedData());
+        builder.append('\n');
+        builder.append(SHAUtils.bytesToHex(this.getData()));
         builder.append("---");
         if (this.left != null){
             builder.append(this.left.getUnHashedData());
