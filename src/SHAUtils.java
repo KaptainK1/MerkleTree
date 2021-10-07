@@ -1,8 +1,10 @@
+import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 
 
 public class SHAUtils {
@@ -48,7 +50,7 @@ public class SHAUtils {
         return SHAUtils.digest(finalHashInt.toByteArray(), algorithm);
     }
 
-    public static void main(String[] args){
+    public static void main(String[] args) throws IOException {
 
         String alg = "SHA-256";
 
@@ -75,6 +77,19 @@ public class SHAUtils {
 
         System.out.println("hex value is " + bytesToHex(finalHash) + " length is " + finalHash.length);
         System.out.println(finalInt.bitCount());
+
+        Transaction tx = new Transaction("Tester", 1.00d);
+
+        byte[] data = tx.toByteArray();
+
+
+
+        System.out.println(tx.hashCode());
+        System.out.println(tx);
+        System.out.println(Arrays.toString(data));
+
+        byte[] transactionHash = SHAUtils.digest(data, alg);
+        System.out.println(SHAUtils.bytesToHex(transactionHash));
 
 
     }
